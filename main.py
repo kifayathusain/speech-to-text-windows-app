@@ -1,102 +1,33 @@
+"""CLI entry point for the Windows TTS app.
+
+Reads a ``Speaker: text`` conversation script, synthesizes each line with
+Microsoft Edge TTS, and combines the resulting segments into a single audio
+file with FFmpeg. The actual pipeline lives in :mod:`ttsapp.service` so a
+future desktop UI can reuse it without going through this CLI.
+"""
+
 import asyncio
-import subprocess
-from pathlib import Path
 
-import edge_tts
-
-
-VOICES = {
-    "Receptionist": "en-GB-SoniaNeural",
-    "Caller": "en-GB-RyanNeural",
-}
-
-INPUT_FILE = "conversation.txt"
-OUTPUT_DIR = Path("audio_parts")
-FINAL_AUDIO = "conversation.mp3"
+from ttsapp.config import DEFAULT_FINAL_AUDIO, DEFAULT_INPUT_FILE, DEFAULT_OUTPUT_DIR, VOICES
+from ttsapp.parser import ConversationLine
+from ttsapp.service import generate_conversation
 
 
-async def generate_line(index, speaker, text, voice):
-    output_file = OUTPUT_DIR / f"line_{index:03d}.mp3"
-
-    communicate = edge_tts.Communicate(
-        text=text,
-        voice=voice
-    )
-
-    await communicate.save(str(output_file))
-
-    print(f"Created: {output_file}")
+def _print_progress(index: int, total: int, line: ConversationLine) -> None:
+    print(f"[{index}/{total}] Created: line_{index:03d}.mp3 ({line.speaker})")
 
 
-async def main():
-
-    OUTPUT_DIR.mkdir(exist_ok=True)
-
-    lines = []
-
-    with open(INPUT_FILE, "r", encoding="utf-8") as file:
-        for line in file:
-            line = line.strip()
-
-            if not line:
-                continue
-
-            speaker, text = line.split(":", 1)
-
-            speaker = speaker.strip()
-            text = text.strip()
-
-            if speaker not in VOICES:
-                raise ValueError(
-                    f"Unknown speaker '{speaker}'. "
-                    f"Expected: {list(VOICES.keys())}"
-                )
-
-            lines.append(
-                (speaker, text, VOICES[speaker])
-            )
-
-    # Generate audio files
-    for index, (speaker, text, voice) in enumerate(lines, start=1):
-        await generate_line(
-            index,
-            speaker,
-            text,
-            voice
-        )
-
-    # Create FFmpeg concat file
-    concat_file = OUTPUT_DIR / "concat.txt"
-
-    with open(concat_file, "w", encoding="utf-8") as file:
-
-        for index in range(1, len(lines) + 1):
-            audio_file = OUTPUT_DIR / f"line_{index:03d}.mp3"
-
-            file.write(
-                f"file '{audio_file.resolve().as_posix()}'\n"
-            )
-
-    # Combine audio
-    subprocess.run(
-        [
-            "ffmpeg",
-            "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(concat_file),
-            "-c",
-            "copy",
-            FINAL_AUDIO,
-        ],
-        check=True,
+async def main() -> None:
+    final_audio = await generate_conversation(
+        input_file=DEFAULT_INPUT_FILE,
+        output_dir=DEFAULT_OUTPUT_DIR,
+        final_audio=DEFAULT_FINAL_AUDIO,
+        voices=VOICES,
+        on_progress=_print_progress,
     )
 
     print()
-    print(f"Final audio created: {FINAL_AUDIO}")
+    print(f"Final audio created: {final_audio}")
 
 
 if __name__ == "__main__":

@@ -1,50 +1,28 @@
-import subprocess
-from pathlib import Path
+"""Standalone helper: recombine existing ``audio_parts/line_*.mp3`` segments.
+
+Useful when audio segments already exist (e.g. after a partial/interrupted
+run of ``main.py``) and only the final FFmpeg combination step needs to be
+re-run. Shares the same FFmpeg adapter as the main pipeline.
+"""
+
+from ttsapp.audio_combiner import combine_audio
+from ttsapp.config import DEFAULT_FINAL_AUDIO, DEFAULT_OUTPUT_DIR
 
 
-INPUT_FILE = "conversation.txt"
-OUTPUT_DIR = Path("audio_parts")
-FINAL_AUDIO = "conversation.mp3"
+def main() -> None:
+    DEFAULT_OUTPUT_DIR.mkdir(exist_ok=True)
 
-def main():
+    audio_files = sorted(DEFAULT_OUTPUT_DIR.glob("line_*.mp3"))
 
-    OUTPUT_DIR.mkdir(exist_ok=True)
+    if not audio_files:
+        raise FileNotFoundError(
+            f"No 'line_*.mp3' files found in {DEFAULT_OUTPUT_DIR}/"
+        )
 
-    # Read count from audio parts
-    lines = [f for f in OUTPUT_DIR.glob("line_*.mp3")]
-
-    # Create FFmpeg concat file
-    concat_file = OUTPUT_DIR / "concat.txt"
-
-    with open(concat_file, "w", encoding="utf-8") as file:
-
-        for index in range(1, len(lines) + 1):
-            audio_file = OUTPUT_DIR / f"line_{index:03d}.mp3"
-
-            file.write(
-                f"file '{audio_file.resolve().as_posix()}'\n"
-            )
-
-    # Combine audio
-    subprocess.run(
-        [
-            "ffmpeg",
-            "-y",
-            "-f",
-            "concat",
-            "-safe",
-            "0",
-            "-i",
-            str(concat_file),
-            "-c",
-            "copy",
-            FINAL_AUDIO,
-        ],
-        check=True,
-    )
+    final_audio = combine_audio(audio_files, DEFAULT_OUTPUT_DIR, DEFAULT_FINAL_AUDIO)
 
     print()
-    print(f"Final audio created: {FINAL_AUDIO}")
+    print(f"Final audio created: {final_audio}")
 
 
 if __name__ == "__main__":
