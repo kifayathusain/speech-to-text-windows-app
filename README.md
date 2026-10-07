@@ -44,6 +44,31 @@ This opens a desktop window where you can:
 The desktop UI is built with Tkinter (bundled with Python), so no extra
 dependency is required to run it.
 
+### Build a distributable Windows app
+
+The app can be packaged as a self-contained, 64-bit Windows folder using
+PyInstaller. The ZIP includes the application, Python runtime, and Python
+dependencies; end users do not need Python installed.
+
+From PowerShell on 64-bit Windows, run:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
+.\build-windows.ps1
+```
+
+The resulting `dist\WindowsTTSApp-windows-x64.zip` contains the app folder.
+Extract the entire folder and run `WindowsTTSApp.exe`; do not move the
+executable out of its folder. Builds must be produced on Windows for Windows.
+
+FFmpeg is intentionally not bundled. Install it separately using the
+[FFmpeg download options](https://ffmpeg.org/download.html) and ensure
+`ffmpeg.exe` is available on `PATH` before generating audio; check with
+`ffmpeg -version`. This avoids redistributing a separately licensed binary.
+The app also needs internet access for Microsoft Edge TTS. Neither prerequisite
+is downloaded by the app at runtime.
+
 ### Command line
 
 1. Edit `conversation.txt` with lines formatted as `Speaker: text`, one line
@@ -93,6 +118,16 @@ filesystem/output (audio_parts/*.mp3, conversation.mp3)
   function a UI or CLI needs to call to run the full pipeline, with an
   optional progress callback. It accepts either `input_file` (CLI) or
   `input_text` (desktop UI) as the conversation script source.
+- `ttsapp/tts_engine.py` validates non-empty text and voice selection, sends
+  Unicode text and the selected voice to Edge TTS, and writes each segment
+  through a temporary file before atomically replacing its destination. A
+  failed or cancelled synthesis therefore cannot leave a partial segment in
+  place; Edge TTS failures are reported with their underlying reason.
+- `ttsapp/audio_combiner.py` combines segments in their parsed order using
+  FFmpeg's concat demuxer. It uses temporary manifest/output files, atomically
+  replaces the final audio only after successful combination, preserves any
+  existing final file on failure, and reports missing FFmpeg or its error
+  output clearly.
 - `ttsapp/gui.py` implements the desktop window. It runs generation on a
   background thread (with its own asyncio event loop) and posts progress
   back to the UI thread through a queue, so the window never freezes while

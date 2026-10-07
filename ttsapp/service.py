@@ -1,7 +1,7 @@
 """Application/service layer orchestrating parsing, synthesis and combining.
 
-This is the layer a future UI (M02) should call into instead of talking to
-the TTS/FFmpeg adapters directly.
+This is the layer the CLI and desktop UI use instead of talking to the
+TTS/FFmpeg adapters directly.
 """
 
 from pathlib import Path
@@ -31,12 +31,15 @@ async def generate_conversation(
     Returns the path to the final combined audio file.
     """
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     if input_text is not None:
         lines: List[ConversationLine] = parse_conversation_text(input_text, voices)
     else:
         lines = parse_conversation(input_file, voices)
+
+    if not lines:
+        raise ValueError("Conversation script must contain at least one dialogue line.")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     audio_files: List[Path] = []
     total = len(lines)

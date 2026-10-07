@@ -91,3 +91,8 @@ def test_parse_conversation_text_raises_on_unknown_speaker():
 def test_parse_conversation_text_raises_on_malformed_line():
     with pytest.raises(ValueError):
         parse_conversation_text("No colon here\n", VOICES)
+
+
+def test_parse_conversation_text_rejects_empty_dialogue():
+    with pytest.raises(ValueError, match="Empty dialogue text"):
+        parse_conversation_text("Receptionist:   \n", VOICES)

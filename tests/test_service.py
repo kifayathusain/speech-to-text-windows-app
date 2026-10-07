@@ -1,6 +1,8 @@
 import asyncio
 from pathlib import Path
 
+import pytest
+
 from ttsapp.parser import ConversationLine
 from ttsapp.service import generate_conversation
 
@@ -115,3 +117,20 @@ def test_generate_conversation_accepts_in_memory_text(tmp_path: Path, monkeypatc
     assert len(synthesized) == 2
     assert synthesized[0][0] == "Hello there."
     assert synthesized[1][0] == "Hi, thanks for calling."
+
+
+def test_generate_conversation_rejects_empty_script_before_creating_outputs(
+    tmp_path: Path,
+):
+    output_dir = tmp_path / "audio_parts"
+
+    with pytest.raises(ValueError, match="at least one dialogue line"):
+        asyncio.run(
+            generate_conversation(
+                output_dir=output_dir,
+                final_audio=tmp_path / "conversation.mp3",
+                input_text=" \n\n",
+            )
+        )
+
+    assert not output_dir.exists()

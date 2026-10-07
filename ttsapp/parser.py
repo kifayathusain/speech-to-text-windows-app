@@ -40,7 +40,7 @@ def parse_conversation_text(text: str, voices: Dict[str, str]) -> List[Conversat
 
     lines: List[ConversationLine] = []
 
-    for raw_line in text.splitlines():
+    for line_number, raw_line in enumerate(text.splitlines(), start=1):
         raw_line = raw_line.strip()
 
         if not raw_line:
@@ -54,6 +54,11 @@ def parse_conversation_text(text: str, voices: Dict[str, str]) -> List[Conversat
         speaker, line_text = raw_line.split(":", 1)
         speaker = speaker.strip()
         line_text = line_text.strip()
+
+        if not line_text:
+            raise ValueError(
+                f"Empty dialogue text on line {line_number} for speaker '{speaker}'."
+            )
 
         if speaker not in voices:
             raise UnknownSpeakerError(
