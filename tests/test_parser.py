@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from ttsapp.parser import UnknownSpeakerError, parse_conversation
+from ttsapp.parser import UnknownSpeakerError, parse_conversation, parse_conversation_text
 
 VOICES = {
     "Receptionist": "en-GB-SoniaNeural",
@@ -67,3 +67,27 @@ def test_parse_conversation_handles_colons_in_dialogue(tmp_path: Path):
     lines = parse_conversation(script, VOICES)
 
     assert lines[0].text == "The time is 6:30 PM."
+
+
+def test_parse_conversation_text_matches_file_based_parsing(tmp_path: Path):
+    """The desktop UI feeds text directly; it must parse identically to a file."""
+
+    script_text = "Receptionist: Hello there.\n\nCaller: Hi, I have a question.\n"
+
+    script = tmp_path / "conversation.txt"
+    script.write_text(script_text, encoding="utf-8")
+
+    from_file = parse_conversation(script, VOICES)
+    from_text = parse_conversation_text(script_text, VOICES)
+
+    assert from_file == from_text
+
+
+def test_parse_conversation_text_raises_on_unknown_speaker():
+    with pytest.raises(UnknownSpeakerError):
+        parse_conversation_text("Narrator: Not configured.\n", VOICES)
+
+
+def test_parse_conversation_text_raises_on_malformed_line():
+    with pytest.raises(ValueError):
+        parse_conversation_text("No colon here\n", VOICES)

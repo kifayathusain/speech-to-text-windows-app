@@ -26,36 +26,47 @@ def parse_conversation(input_file: Path, voices: Dict[str, str]) -> List[Convers
     maps each expected speaker label to an Edge TTS voice name.
     """
 
+    with open(input_file, "r", encoding="utf-8") as file:
+        return parse_conversation_text(file.read(), voices)
+
+
+def parse_conversation_text(text: str, voices: Dict[str, str]) -> List[ConversationLine]:
+    """Parse an in-memory conversation script (same format as ``parse_conversation``).
+
+    Shared by the CLI (reading from a file) and the desktop UI (reading
+    directly from a text input widget) so both go through identical
+    validation.
+    """
+
     lines: List[ConversationLine] = []
 
-    with open(input_file, "r", encoding="utf-8") as file:
-        for raw_line in file:
-            raw_line = raw_line.strip()
+    for raw_line in text.splitlines():
+        raw_line = raw_line.strip()
 
-            if not raw_line:
-                continue
+        if not raw_line:
+            continue
 
-            if ":" not in raw_line:
-                raise ValueError(
-                    f"Malformed line (expected 'Speaker: text'): {raw_line!r}"
-                )
-
-            speaker, text = raw_line.split(":", 1)
-            speaker = speaker.strip()
-            text = text.strip()
-
-            if speaker not in voices:
-                raise UnknownSpeakerError(
-                    f"Unknown speaker '{speaker}'. Expected: {list(voices.keys())}"
-                )
-
-            lines.append(
-                ConversationLine(
-                    index=len(lines) + 1,
-                    speaker=speaker,
-                    text=text,
-                    voice=voices[speaker],
-                )
+        if ":" not in raw_line:
+            raise ValueError(
+                f"Malformed line (expected 'Speaker: text'): {raw_line!r}"
             )
+
+        speaker, line_text = raw_line.split(":", 1)
+        speaker = speaker.strip()
+        line_text = line_text.strip()
+
+        if speaker not in voices:
+            raise UnknownSpeakerError(
+                f"Unknown speaker '{speaker}'. Expected: {list(voices.keys())}"
+            )
+
+        lines.append(
+            ConversationLine(
+                index=len(lines) + 1,
+                speaker=speaker,
+                text=line_text,
+                voice=voices[speaker],
+            )
+        )
 
     return lines

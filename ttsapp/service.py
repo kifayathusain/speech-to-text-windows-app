@@ -9,7 +9,7 @@ from typing import Callable, Dict, List, Optional
 
 from . import audio_combiner, tts_engine
 from .config import DEFAULT_FINAL_AUDIO, DEFAULT_INPUT_FILE, DEFAULT_OUTPUT_DIR, VOICES
-from .parser import ConversationLine, parse_conversation
+from .parser import ConversationLine, parse_conversation, parse_conversation_text
 
 ProgressCallback = Optional[Callable[[int, int, ConversationLine], None]]
 
@@ -20,15 +20,23 @@ async def generate_conversation(
     final_audio: Path = DEFAULT_FINAL_AUDIO,
     voices: Dict[str, str] = VOICES,
     on_progress: ProgressCallback = None,
+    input_text: Optional[str] = None,
 ) -> Path:
     """Run the full pipeline: parse -> synthesize each line -> combine audio.
+
+    If ``input_text`` is provided (e.g. from the desktop UI's text box), it is
+    parsed directly instead of reading ``input_file`` from disk. Otherwise the
+    script is read from ``input_file``, preserving the original CLI behavior.
 
     Returns the path to the final combined audio file.
     """
 
-    output_dir.mkdir(exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
-    lines: List[ConversationLine] = parse_conversation(input_file, voices)
+    if input_text is not None:
+        lines: List[ConversationLine] = parse_conversation_text(input_text, voices)
+    else:
+        lines = parse_conversation(input_file, voices)
 
     audio_files: List[Path] = []
     total = len(lines)
