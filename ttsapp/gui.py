@@ -21,11 +21,56 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 from typing import Dict, Optional
 
-from .config import DEFAULT_FINAL_AUDIO, DEFAULT_OUTPUT_DIR, VOICES
+from .audio_combiner import FFmpegExecutionError, FFmpegNotFoundError
+from .config import (
+    APP_NAME,
+    APP_VERSION,
+    DEFAULT_FINAL_AUDIO,
+    DEFAULT_OUTPUT_DIR,
+    VOICES,
+)
 from .parser import ConversationLine
 from .service import generate_conversation
+from .tts_engine import TTSGenerationError
 
-APP_TITLE = "Windows TTS App"
+APP_TITLE = f"{APP_NAME} {APP_VERSION}"
+
+
+def default_desktop_output_path() -> Path:
+    """Return a writable, predictable output location independent of the CWD."""
+
+    return Path.home() / "Documents" / APP_NAME / DEFAULT_FINAL_AUDIO
+
+
+def format_generation_error(error: Exception) -> str:
+    """Add plain-language recovery steps to common generation errors."""
+
+    if isinstance(error, FFmpegNotFoundError):
+        return (
+            "FFmpeg is required to combine the generated speech. Install FFmpeg, "
+            "add ffmpeg.exe to PATH, then restart the app. Verify the installation "
+            "with `ffmpeg -version`."
+        )
+    if isinstance(error, FFmpegExecutionError):
+        return (
+            "The speech was generated, but FFmpeg could not combine the audio. "
+            "Check that FFmpeg is installed and that the generated files are "
+            "available, then try again.\n\n"
+            f"Details: {error}"
+        )
+    if isinstance(error, PermissionError):
+        return (
+            "The app could not save to the selected location. Choose a folder "
+            "where your account has write permission.\n\n"
+            f"Details: {error}"
+        )
+    if isinstance(error, TTSGenerationError):
+        return (
+            "Speech generation failed. Check your internet connection and the "
+            "selected Edge TTS voice, then try again.\n\n"
+            f"Details: {error}"
+        )
+    return str(error)
 
 
 def validate_script_text(text: str) -> None:
@@ -78,13 +123,13 @@ class TTSDesktopApp(tk.Tk):
         super().__init__()
 
         self.title(APP_TITLE)
-        self.geometry("640x560")
-        self.minsize(560, 480)
+        self.geometry("680x600")
+        self.minsize(600, 500)
 
         self._voices = dict(VOICES)
         self._voice_entries: Dict[str, tk.StringVar] = {}
         self._output_path_var = tk.StringVar(
-            value=str((Path.cwd() / DEFAULT_FINAL_AUDIO).resolve())
+            value=str(default_desktop_output_path())
         )
         self._status_var = tk.StringVar(value="Ready.")
         self._queue: "queue.Queue[_ProgressMessage]" = queue.Queue()
@@ -106,6 +151,10 @@ class TTSDesktopApp(tk.Tk):
             ),
         )
         text_label.pack(anchor="w", **padding)
+        ttk.Label(
+            self,
+            text="Requires an internet connection and FFmpeg installed on PATH.",
+        ).pack(anchor="w", padx=10)
 
         text_frame = ttk.Frame(self)
         text_frame.pack(fill="both", expand=True, padx=10)
@@ -177,7 +226,9 @@ class TTSDesktopApp(tk.Tk):
             messagebox.showerror(APP_TITLE, str(error))
             return
 
-        final_audio = Path(self._output_path_var.get().strip() or str(DEFAULT_FINAL_AUDIO))
+        final_audio = Path(
+            self._output_path_var.get().strip() or str(default_desktop_output_path())
+        )
         output_dir = final_audio.parent / DEFAULT_OUTPUT_DIR.name
         voices = build_voice_overrides(
             self._voices, {k: v.get() for k, v in self._voice_entries.items()}
@@ -223,7 +274,9 @@ class TTSDesktopApp(tk.Tk):
             )
             self._queue.put(_ProgressMessage("success", final_audio=result))
         except Exception as error:  # noqa: BLE001 - surface any failure to the UI
-            self._queue.put(_ProgressMessage("error", message=str(error)))
+            self._queue.put(
+                _ProgressMessage("error", message=format_generation_error(error))
+            )
 
     # -- UI-thread queue draining --------------------------------------------
 
@@ -251,8 +304,9 @@ class TTSDesktopApp(tk.Tk):
             messagebox.showinfo(APP_TITLE, f"Final audio created:\n{final_audio}")
         elif message.kind == "error":
             self._set_busy(False)
-            self._status_var.set("Error during generation.")
-            messagebox.showerror(APP_TITLE, message.data["message"])
+            error_message = message.data["message"]
+            self._status_var.set("Generation failed. See the error message.")
+            messagebox.showerror(APP_TITLE, error_message)
 
 
 def main() -> None:

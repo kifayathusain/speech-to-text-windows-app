@@ -6,6 +6,9 @@ agree on defaults without duplicating literals.
 
 from pathlib import Path
 
+APP_NAME = "Windows TTS App"
+APP_VERSION = "1.0.0"
+
 # Maps a speaker label used in the conversation script to an Edge TTS voice.
 VOICES = {
     "Receptionist": "en-GB-SoniaNeural",

@@ -134,3 +134,89 @@ def test_generate_conversation_rejects_empty_script_before_creating_outputs(
         )
 
     assert not output_dir.exists()
+
+
+def test_generate_conversation_stops_after_tts_failure(tmp_path: Path, monkeypatch):
+    output_dir = tmp_path / "audio_parts"
+    final_audio = tmp_path / "conversation.mp3"
+    final_audio.write_bytes(b"previous-valid-audio")
+    synthesized = []
+    combined = []
+
+    async def fake_synthesize_line(text, voice, output_file):
+        synthesized.append(text)
+        if text == "Second line":
+            raise RuntimeError("TTS service unavailable")
+        output_file.write_bytes(b"first-line-audio")
+
+    def unexpected_combine(*args):
+        combined.append(args)
+        pytest.fail("Audio must not be combined after a synthesis failure")
+
+    monkeypatch.setattr(
+        "ttsapp.service.tts_engine.synthesize_line", fake_synthesize_line
+    )
+    monkeypatch.setattr(
+        "ttsapp.service.audio_combiner.combine_audio", unexpected_combine
+    )
+    progress = []
+
+    with pytest.raises(RuntimeError, match="TTS service unavailable"):
+        asyncio.run(
+            generate_conversation(
+                output_dir=output_dir,
+                final_audio=final_audio,
+                voices={"Caller": "en-GB-RyanNeural"},
+                input_text="Caller: First line\nCaller: Second line",
+                on_progress=lambda index, total, line: progress.append(index),
+            )
+        )
+
+    assert synthesized == ["First line", "Second line"]
+    assert combined == []
+    assert progress == [1]
+    assert final_audio.read_bytes() == b"previous-valid-audio"
+
+
+def test_generate_conversation_repeated_runs_overwrite_final_and_use_current_lines(
+    tmp_path: Path, monkeypatch
+):
+    output_dir = tmp_path / "audio_parts"
+    final_audio = tmp_path / "exports" / "conversation.mp3"
+    combined_inputs = []
+
+    async def fake_synthesize_line(text, voice, output_file):
+        output_file.write_text(text, encoding="utf-8")
+
+    def fake_combine_audio(audio_files, output_dir, final_audio_path):
+        combined_inputs.append([path.name for path in audio_files])
+        final_audio_path.parent.mkdir(parents=True, exist_ok=True)
+        final_audio_path.write_text(
+            "|".join(path.read_text(encoding="utf-8") for path in audio_files),
+            encoding="utf-8",
+        )
+        return final_audio_path
+
+    monkeypatch.setattr(
+        "ttsapp.service.tts_engine.synthesize_line", fake_synthesize_line
+    )
+    monkeypatch.setattr(
+        "ttsapp.service.audio_combiner.combine_audio", fake_combine_audio
+    )
+
+    async def generate(script):
+        return await generate_conversation(
+            output_dir=output_dir,
+            final_audio=final_audio,
+            voices={"Caller": "en-GB-RyanNeural"},
+            input_text=script,
+        )
+
+    asyncio.run(generate("Caller: First run\nCaller: First run, second line"))
+    asyncio.run(generate("Caller: Second run"))
+
+    assert final_audio.read_text(encoding="utf-8") == "Second run"
+    assert combined_inputs == [
+        ["line_001.mp3", "line_002.mp3"],
+        ["line_001.mp3"],
+    ]

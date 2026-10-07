@@ -2,7 +2,9 @@
 
 Generates a two-voice conversation audio file from a plain-text script using
 Microsoft Edge TTS, then combines the per-line audio segments into a single
-file with FFmpeg.
+file with FFmpeg. The desktop application is named **Windows TTS App**; its
+version is shown in the window title and is maintained as `APP_VERSION` in
+`ttsapp/config.py`.
 
 ## Prerequisites
 
@@ -43,6 +45,12 @@ This opens a desktop window where you can:
 
 The desktop UI is built with Tkinter (bundled with Python), so no extra
 dependency is required to run it.
+By default, the final MP3 is saved to
+`%USERPROFILE%\Documents\Windows TTS App\conversation.mp3`; the generated
+line segments are kept in the adjacent `audio_parts` folder. Choose another
+output path with "Browse..." if preferred. Existing final audio is replaced
+only after a new file has been generated successfully. Temporary files are
+removed automatically; only segments from the current script are combined.
 
 ### Build a distributable Windows app
 
@@ -68,6 +76,25 @@ FFmpeg is intentionally not bundled. Install it separately using the
 `ffmpeg -version`. This avoids redistributing a separately licensed binary.
 The app also needs internet access for Microsoft Edge TTS. Neither prerequisite
 is downloaded by the app at runtime.
+
+To publish a release, update `APP_VERSION` in `ttsapp/config.py` using
+semantic versioning, run the test suite, run `.\build-windows.ps1`, and smoke
+test the extracted ZIP on Windows. The build script replaces the previous
+`dist\WindowsTTSApp` folder and ZIP so stale files are not included.
+
+### Troubleshooting
+
+- **"FFmpeg is required" / FFmpeg not found:** Install FFmpeg, add the folder
+  containing `ffmpeg.exe` to the Windows `PATH`, restart the app, and verify
+  from PowerShell with `ffmpeg -version`.
+- **Speech generation failed:** Confirm internet access and try again. If
+  you changed a voice, verify its Edge TTS voice name; the underlying service
+  error is shown in the dialog.
+- **Cannot save the output:** Use "Browse..." to choose a folder where your
+  Windows account has write access, such as Documents.
+- **FFmpeg could not combine the audio:** Check the FFmpeg installation and
+  available disk space. The dialog includes FFmpeg's error details; the
+  existing final audio is preserved when combination fails.
 
 ### Command line
 
@@ -134,7 +161,9 @@ filesystem/output (audio_parts/*.mp3, conversation.mp3)
   Edge TTS/FFmpeg are working. The validation/merging helpers
   (`validate_script_text`, `build_voice_overrides`) are plain functions kept
   separate from the Tkinter widgets so they're unit-testable without a
-  display.
+  display. The desktop default output goes into the user's Documents folder,
+  not the current working directory, and common service failures include
+  recovery guidance.
 
 ## Tests
 
@@ -142,7 +171,20 @@ filesystem/output (audio_parts/*.mp3, conversation.mp3)
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
+The automated suite covers parsing, long Unicode input, multiple voices and
+segments, output-path creation, reruns/overwrites, TTS and FFmpeg failures,
+cancellation cleanup, and the desktop UI's background-worker/queue boundary.
 Tests mock the Edge TTS and FFmpeg adapters, so they run offline and without
-requiring the `ffmpeg` executable. A real end-to-end smoke run (network +
-FFmpeg) was performed manually during development; see
-`automation/AGENT_STATE.md` for details.
+requiring the `ffmpeg` executable.
+
+For a Windows packaging smoke test, build the distribution with
+`.\build-windows.ps1`, extract `dist\WindowsTTSApp-windows-x64.zip` to a
+temporary directory, and launch `WindowsTTSApp.exe` from the extracted
+`WindowsTTSApp` folder. Confirm the desktop window opens, then close it. This
+checks startup from the packaged archive rather than from the repository.
+FFmpeg is still required to generate audio; a real TTS/FFmpeg end-to-end run
+also requires network access and FFmpeg installed on `PATH`. To complete the
+end-to-end smoke test, launch the extracted app, enter a short script using
+the default speaker labels (for example `Caller: Hello from the release
+smoke test.`), generate audio, and confirm that the MP3 is non-empty at the
+selected output path.

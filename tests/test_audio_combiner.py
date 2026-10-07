@@ -36,7 +36,9 @@ def test_write_concat_file_escapes_quotes_in_paths(tmp_path: Path):
 def test_combine_audio_invokes_ffmpeg_with_expected_arguments(tmp_path, monkeypatch):
     audio_files = [tmp_path / "line_001.mp3"]
     audio_files[0].write_bytes(b"fake-audio")
-    final_audio = tmp_path / "final.mp3"
+    final_audio = tmp_path / "output" / "nested" / "final.mp3"
+    final_audio.parent.mkdir(parents=True)
+    final_audio.write_bytes(b"previous-audio")
 
     captured_cmd = {}
 
@@ -66,7 +68,8 @@ def test_combine_audio_invokes_ffmpeg_with_expected_arguments(tmp_path, monkeypa
     assert captured_cmd["concat"] == (
         f"file '{audio_files[0].resolve().as_posix()}'\n"
     )
-    assert set(tmp_path.iterdir()) == {*audio_files, final_audio}
+    assert set(tmp_path.iterdir()) == {*audio_files, tmp_path / "output"}
+    assert list(final_audio.parent.iterdir()) == [final_audio]
 
 
 def test_combine_audio_raises_clear_error_when_ffmpeg_missing(tmp_path, monkeypatch):

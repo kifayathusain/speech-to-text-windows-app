@@ -2,9 +2,17 @@ $ErrorActionPreference = "Stop"
 
 $repoRoot = (Resolve-Path $PSScriptRoot).Path
 $python = Join-Path $repoRoot ".venv\Scripts\python.exe"
+$distribution = Join-Path $repoRoot "dist\WindowsTTSApp"
+$archive = Join-Path $repoRoot "dist\WindowsTTSApp-windows-x64.zip"
 
 if (-not (Test-Path $python)) {
     throw "Python environment not found. Create .venv and install requirements-build.txt first."
+}
+
+foreach ($generatedPath in @($distribution, $archive)) {
+    if (Test-Path $generatedPath) {
+        Remove-Item -LiteralPath $generatedPath -Recurse -Force
+    }
 }
 
 Push-Location $repoRoot
@@ -15,15 +23,9 @@ try {
         throw "PyInstaller failed with exit code $LASTEXITCODE."
     }
 
-    $distribution = Join-Path $repoRoot "dist\WindowsTTSApp"
     $executable = Join-Path $distribution "WindowsTTSApp.exe"
     if (-not (Test-Path $executable)) {
         throw "PyInstaller did not produce $executable."
-    }
-
-    $archive = Join-Path $repoRoot "dist\WindowsTTSApp-windows-x64.zip"
-    if (Test-Path $archive) {
-        Remove-Item -LiteralPath $archive -Force
     }
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem

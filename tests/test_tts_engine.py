@@ -35,6 +35,30 @@ def test_synthesize_line_saves_unicode_audio_atomically(tmp_path: Path, monkeypa
     assert list(output_file.parent.iterdir()) == [output_file]
 
 
+def test_synthesize_line_handles_long_unicode_text_and_overwrites_output(
+    tmp_path: Path, monkeypatch
+):
+    output_file = tmp_path / "line_001.mp3"
+    output_file.write_bytes(b"previous-audio")
+    text = ("Café こんにちは — " * 2_000).strip()
+    captured = {}
+
+    class LongTextCommunicate:
+        def __init__(self, text, voice):
+            captured["text"] = text
+
+        async def save(self, path):
+            Path(path).write_bytes(b"new-audio")
+
+    monkeypatch.setattr(tts_engine.edge_tts, "Communicate", LongTextCommunicate)
+
+    asyncio.run(tts_engine.synthesize_line(text, "en-GB-SoniaNeural", output_file))
+
+    assert captured["text"] == text
+    assert output_file.read_bytes() == b"new-audio"
+    assert list(tmp_path.iterdir()) == [output_file]
+
+
 def test_synthesize_line_removes_partial_temp_and_preserves_existing_output(
     tmp_path: Path, monkeypatch
 ):
@@ -52,6 +76,31 @@ def test_synthesize_line_removes_partial_temp_and_preserves_existing_output(
     monkeypatch.setattr(tts_engine.edge_tts, "Communicate", FailingCommunicate)
 
     with pytest.raises(tts_engine.TTSGenerationError, match="connection closed"):
+        asyncio.run(
+            tts_engine.synthesize_line("Hello", "en-GB-SoniaNeural", output_file)
+        )
+
+    assert output_file.read_bytes() == b"previous-valid-audio"
+    assert list(tmp_path.iterdir()) == [output_file]
+
+
+def test_synthesize_line_cancellation_cleans_temporary_file_and_preserves_output(
+    tmp_path: Path, monkeypatch
+):
+    output_file = tmp_path / "line_001.mp3"
+    output_file.write_bytes(b"previous-valid-audio")
+
+    class CancelledCommunicate:
+        def __init__(self, text, voice):
+            pass
+
+        async def save(self, path):
+            Path(path).write_bytes(b"partial-audio")
+            raise asyncio.CancelledError
+
+    monkeypatch.setattr(tts_engine.edge_tts, "Communicate", CancelledCommunicate)
+
+    with pytest.raises(asyncio.CancelledError):
         asyncio.run(
             tts_engine.synthesize_line("Hello", "en-GB-SoniaNeural", output_file)
         )
