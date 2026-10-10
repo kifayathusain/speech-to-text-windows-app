@@ -1,7 +1,7 @@
 """Tests for the non-Tkinter logic in the desktop UI module.
 
 These test the plain functions ``validate_script_text`` and
-``build_voice_overrides`` directly, without constructing any Tkinter
+``build_speaker_voice_mapping`` directly, without constructing any Tkinter
 widgets, so they run headless in CI without a display.
 """
 
@@ -15,7 +15,7 @@ from ttsapp import gui
 from ttsapp.audio_combiner import FFmpegExecutionError, FFmpegNotFoundError
 from ttsapp.gui import (
     TTSDesktopApp,
-    build_voice_overrides,
+    build_speaker_voice_mapping,
     default_desktop_output_path,
     format_generation_error,
     validate_script_text,
@@ -38,25 +38,35 @@ def test_validate_script_text_accepts_real_content():
     validate_script_text("Receptionist: Hello there.\n")
 
 
-def test_build_voice_overrides_keeps_defaults_when_blank():
-    base = {"Receptionist": "en-GB-SoniaNeural", "Caller": "en-GB-RyanNeural"}
-
-    merged = build_voice_overrides(base, {"Receptionist": "", "Caller": "  "})
-
-    assert merged == base
-    # Ensure the original dict was not mutated.
-    assert base == {"Receptionist": "en-GB-SoniaNeural", "Caller": "en-GB-RyanNeural"}
-
-
-def test_build_voice_overrides_applies_non_blank_overrides():
-    base = {"Receptionist": "en-GB-SoniaNeural", "Caller": "en-GB-RyanNeural"}
-
-    merged = build_voice_overrides(base, {"Receptionist": "en-US-JennyNeural"})
-
-    assert merged == {
-        "Receptionist": "en-US-JennyNeural",
-        "Caller": "en-GB-RyanNeural",
+def test_build_speaker_voice_mapping_accepts_custom_names():
+    assert build_speaker_voice_mapping(
+        [("Doctor", " en-US-JennyNeural "), ("Nurse", "en-US-GuyNeural")]
+    ) == {
+        "Doctor": "en-US-JennyNeural",
+        "Nurse": "en-US-GuyNeural",
     }
+
+
+def test_build_speaker_voice_mapping_allows_an_unused_blank_slot():
+    assert build_speaker_voice_mapping(
+        [("Doctor", "en-US-JennyNeural"), ("", "")]
+    ) == {"Doctor": "en-US-JennyNeural"}
+
+
+@pytest.mark.parametrize(
+    ("speaker_rows", "error"),
+    [
+        ([("", "en-US-JennyNeural")], "name for Speaker 1"),
+        ([("Doctor", " ")], "voice for 'Doctor'"),
+        (
+            [("Doctor", "en-US-JennyNeural"), ("Doctor", "en-US-GuyNeural")],
+            "used more than once",
+        ),
+    ],
+)
+def test_build_speaker_voice_mapping_rejects_invalid_rows(speaker_rows, error):
+    with pytest.raises(ValueError, match=error):
+        build_speaker_voice_mapping(speaker_rows)
 
 
 def test_default_desktop_output_path_uses_documents_folder(tmp_path, monkeypatch):
@@ -101,6 +111,10 @@ def test_generate_click_runs_work_in_background_and_updates_ui_from_queue(
     ui_thread_calls = []
 
     async def slow_generation(**kwargs):
+        assert kwargs["voices"] == {
+            "Doctor": "en-US-JennyNeural",
+            "Nurse": "en-US-GuyNeural",
+        }
         generation_started.set()
         await asyncio.to_thread(allow_generation_to_finish.wait, 5)
         return kwargs["final_audio"]
@@ -127,13 +141,15 @@ def test_generate_click_runs_work_in_background_and_updates_ui_from_queue(
 
     class TextBox:
         def get(self, start, end):
-            return "Caller: Hello"
+            return "Doctor: Hello"
 
     app = TTSDesktopApp.__new__(TTSDesktopApp)
     app.text_box = TextBox()
     app._output_path_var = Value(str(tmp_path / "exports" / "final.mp3"))
-    app._voice_entries = {"Caller": Value("en-GB-RyanNeural")}
-    app._voices = {"Caller": "en-GB-RyanNeural"}
+    app._speaker_rows = [
+        (Value("Doctor"), Value("en-US-JennyNeural")),
+        (Value("Nurse"), Value("en-US-GuyNeural")),
+    ]
     app._status_var = Value("Ready.")
     app.generate_button = Button()
     app.progress_bar = Progress()

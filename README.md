@@ -36,8 +36,9 @@ This opens a desktop window where you can:
 1. Enter or paste a conversation script, formatted as `Speaker: text` (one
    line of dialogue per line, matching `conversation.txt`'s format). Blank
    lines are ignored.
-2. Review/override the voice used for each speaker (pre-filled from
-   `ttsapp/config.py`'s `VOICES`).
+2. Edit the names and Edge TTS voices for Speaker 1 and Speaker 2. Each name
+   must exactly match the corresponding label before `:` in the script; the
+   default names and voices are pre-filled from `ttsapp/config.py`'s `VOICES`.
 3. Choose where the combined output MP3 should be saved ("Browse...").
 4. Click "Generate". The window stays responsive while Edge TTS/FFmpeg run
    in the background; progress is shown per line, and a success or error

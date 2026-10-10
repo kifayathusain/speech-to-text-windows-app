@@ -9,7 +9,7 @@ progress/results. All TTS/FFmpeg work is delegated to
 :func:`ttsapp.service.generate_conversation`, so this module does not
 duplicate any pipeline logic.
 
-Plain functions (``validate_script_text``, ``build_voice_overrides``) are
+Plain functions (``validate_script_text``, ``build_speaker_voice_mapping``) are
 kept free of Tkinter so they can be unit tested without a display.
 """
 
@@ -80,23 +80,29 @@ def validate_script_text(text: str) -> None:
         raise ValueError("Please enter or paste some conversation text first.")
 
 
-def build_voice_overrides(
-    base_voices: Dict[str, str], overrides: Dict[str, str]
+def build_speaker_voice_mapping(
+    speaker_rows: list[tuple[str, str]],
 ) -> Dict[str, str]:
-    """Merge user-edited voice entries over the defaults.
+    """Validate editable speaker names and their selected Edge TTS voices."""
 
-    Blank overrides fall back to the default voice for that speaker so the
-    user can leave fields untouched.
-    """
-
-    merged = dict(base_voices)
-
-    for speaker, voice in overrides.items():
+    voices = {}
+    for index, (speaker, voice) in enumerate(speaker_rows, start=1):
+        speaker = speaker.strip()
         voice = voice.strip()
-        if voice:
-            merged[speaker] = voice
+        if not speaker and not voice:
+            continue
+        if not speaker:
+            raise ValueError(f"Please enter a name for Speaker {index}.")
+        if not voice:
+            raise ValueError(f"Please enter an Edge TTS voice for '{speaker}'.")
+        if speaker in voices:
+            raise ValueError(f"Speaker name '{speaker}' is used more than once.")
+        voices[speaker] = voice
 
-    return merged
+    if not voices:
+        raise ValueError("Configure at least one speaker name and voice.")
+
+    return voices
 
 
 class _ProgressMessage:
@@ -127,7 +133,7 @@ class TTSDesktopApp(tk.Tk):
         self.minsize(600, 500)
 
         self._voices = dict(VOICES)
-        self._voice_entries: Dict[str, tk.StringVar] = {}
+        self._speaker_rows: list[tuple[tk.StringVar, tk.StringVar]] = []
         self._output_path_var = tk.StringVar(
             value=str(default_desktop_output_path())
         )
@@ -165,17 +171,35 @@ class TTSDesktopApp(tk.Tk):
         self.text_box.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
 
-        voices_frame = ttk.LabelFrame(self, text="Voices")
-        voices_frame.pack(fill="x", **padding)
-
-        for row, (speaker, voice) in enumerate(self._voices.items()):
-            ttk.Label(voices_frame, text=f"{speaker}:").grid(
-                row=row, column=0, sticky="w", padx=(8, 4), pady=4
+        self._voices_frame = ttk.LabelFrame(
+            self, text="Speaker and voice mapping"
+        )
+        self._voices_frame.pack(fill="x", **padding)
+        ttk.Label(
+            self._voices_frame,
+            text="Speaker names must match the labels before ':' in the script.",
+        ).grid(row=0, column=0, columnspan=3, sticky="w", padx=8, pady=(4, 6))
+        ttk.Label(self._voices_frame, text="Slot").grid(
+            row=1, column=0, sticky="w", padx=(8, 4), pady=4
+        )
+        ttk.Label(self._voices_frame, text="Script speaker name").grid(
+            row=1, column=1, sticky="w", padx=(0, 4), pady=4
+        )
+        ttk.Label(self._voices_frame, text="Edge TTS voice").grid(
+            row=1, column=2, sticky="w", padx=(0, 8), pady=4
+        )
+        for row, (speaker, voice) in enumerate(self._voices.items(), start=1):
+            speaker_var = tk.StringVar(value=speaker)
+            voice_var = tk.StringVar(value=voice)
+            self._speaker_rows.append((speaker_var, voice_var))
+            ttk.Label(self._voices_frame, text=f"Speaker {row}").grid(
+                row=row + 1, column=0, sticky="w", padx=(8, 4), pady=4
             )
-            var = tk.StringVar(value=voice)
-            self._voice_entries[speaker] = var
-            ttk.Entry(voices_frame, textvariable=var, width=30).grid(
-                row=row, column=1, sticky="w", padx=(0, 8), pady=4
+            ttk.Entry(self._voices_frame, textvariable=speaker_var, width=20).grid(
+                row=row + 1, column=1, sticky="w", padx=(0, 4), pady=4
+            )
+            ttk.Entry(self._voices_frame, textvariable=voice_var, width=30).grid(
+                row=row + 1, column=2, sticky="w", padx=(0, 8), pady=4
             )
 
         output_frame = ttk.Frame(self)
@@ -222,6 +246,9 @@ class TTSDesktopApp(tk.Tk):
 
         try:
             validate_script_text(script_text)
+            voices = build_speaker_voice_mapping(
+                [(speaker.get(), voice.get()) for speaker, voice in self._speaker_rows]
+            )
         except ValueError as error:
             messagebox.showerror(APP_TITLE, str(error))
             return
@@ -230,9 +257,6 @@ class TTSDesktopApp(tk.Tk):
             self._output_path_var.get().strip() or str(default_desktop_output_path())
         )
         output_dir = final_audio.parent / DEFAULT_OUTPUT_DIR.name
-        voices = build_voice_overrides(
-            self._voices, {k: v.get() for k, v in self._voice_entries.items()}
-        )
 
         self._set_busy(True)
         self._status_var.set("Generating...")
