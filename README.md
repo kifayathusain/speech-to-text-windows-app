@@ -8,11 +8,11 @@ version is shown in the window title and is maintained as `APP_VERSION` in
 
 ## Prerequisites
 
-- Python 3.10+ (tested on 3.14).
-- [FFmpeg](https://ffmpeg.org/) installed and available on `PATH` (run
-  `ffmpeg -version` to confirm).
-- Internet access (Edge TTS calls Microsoft's online service; no API key is
-  required).
+- Python 3.10–3.13 for all providers (3.13 recommended). Edge/Piper also tested on 3.14.
+- [FFmpeg and FFprobe](https://ffmpeg.org/) installed and available on `PATH`
+  for source runs and packages without bundled tools.
+- Internet for Edge TTS and initial model downloads. Installed local voices run
+  offline on CPU; no API key or GPU is required.
 
 ## Install
 
@@ -55,33 +55,22 @@ removed automatically; only segments from the current script are combined.
 
 ### Build a distributable Windows app
 
-The app can be packaged as a self-contained, 64-bit Windows folder using
-PyInstaller. The ZIP includes the application, Python runtime, and Python
-dependencies; end users do not need Python installed.
-
-From PowerShell on 64-bit Windows, run:
+Use Python 3.10–3.13 with Tkinter for the full CPU package:
 
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements-build.txt
-.\build-windows.ps1
+python -m venv .build-venv
+.\.build-venv\Scripts\python.exe -m pip install -r requirements-build.txt
+.\build-windows.ps1 -PythonExecutable .\.build-venv\Scripts\python.exe
 ```
 
-The resulting `dist\WindowsTTSApp-windows-x64.zip` contains the app folder.
-Extract the entire folder and run `WindowsTTSApp.exe`; do not move the
-executable out of its folder. Builds must be produced on Windows for Windows.
-
-FFmpeg is intentionally not bundled. Install it separately using the
-[FFmpeg download options](https://ffmpeg.org/download.html) and ensure
-`ffmpeg.exe` is available on `PATH` before generating audio; check with
-`ffmpeg -version`. This avoids redistributing a separately licensed binary.
-The app also needs internet access for Microsoft Edge TTS. Neither prerequisite
-is downloaded by the app at runtime.
-
-To publish a release, update `APP_VERSION` in `ttsapp/config.py` using
-semantic versioning, run the test suite, run `.\build-windows.ps1`, and smoke
-test the extracted ZIP on Windows. The build script replaces the previous
-`dist\WindowsTTSApp` folder and ZIP so stale files are not included.
+Each build creates a fresh `dist/release-*` directory and portable ZIP, preserving
+previous builds. Extract the complete folder and launch `WindowsTTSApp.exe`.
+The full profile includes Kokoro, Piper and Edge runtimes; model weights remain
+separate downloads. Optional `-FFmpegDirectory` bundles explicitly supplied,
+license-documented FFmpeg and FFprobe tools with integrity hashes; otherwise both
+must be installed on PATH. See [Windows package setup](docs/setup/WINDOWS_PACKAGE.md)
+for build profiles, diagnostics, licensing status and the required clean Windows
+11 completion check. No release is published automatically.
 
 ### Troubleshooting
 
@@ -166,9 +155,44 @@ filesystem/output (audio_parts/*.mp3, conversation.mp3)
   not the current working directory, and common service failures include
   recovery guidance.
 
+## Audio exports
+
+The desktop supports validated WAV, MP3, and M4A with bitrate, sample-rate,
+mono/stereo, optional loudness normalization, cancellation, and explicit output
+replacement. Both FFmpeg and FFprobe must be on PATH for validated exports.
+See [export setup](docs/setup/AUDIO_EXPORTS.md).
+
+## Model library
+
+Open **Model library...** to download, verify, cancel, reinstall, or remove
+supported offline model files. Runtime and license details appear with each
+model; Python inference dependencies are installed separately. See
+[model library setup](docs/setup/MODEL_LIBRARY.md) for storage and recovery.
+
+## Provider architecture
+
+Generation now resolves a provider through `ttsapp/providers/registry.py`.
+Microsoft Edge TTS remains the default, with the original CLI and desktop
+behavior. The typed provider contract and cancellation boundaries are documented
+in [the provider contract](docs/architecture/PROVIDER_CONTRACT.md).
+Local model runtimes are optional and are not imported by default Edge routing.
+The optional [Piper CPU provider](docs/setup/PIPER.md) is available through the
+Python API with explicitly verified local voices. The [Kokoro-82M CPU provider](docs/setup/KOKORO.md) is available on Python
+3.10–3.13. The desktop now includes provider selection, local voice previews, replay/stop,
+progress, and cancellation; see [desktop controls](docs/setup/DESKTOP_PREVIEW.md). See the
+[tracker](docs/milestones/MILESTONE_TRACKER.md) for validated status.
+
 ## Tests
 
+Contributors and Codex sessions must start with [AGENTS.md](AGENTS.md) and follow
+the authoritative [coding standards](docs/CODING_STANDARDS.md). Development
+tools are installed from `requirements-dev.txt`; Ruff and pytest are configured
+in `pyproject.toml`. See the [milestone plan](docs/milestones/MASTER_PLAN.md) and
+[tracker](docs/milestones/MILESTONE_TRACKER.md) for scope and completion gates.
+
 ```powershell
+.\.venv\Scripts\python.exe -m ruff format --check .
+.\.venv\Scripts\python.exe -m ruff check .
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
@@ -178,14 +202,8 @@ cancellation cleanup, and the desktop UI's background-worker/queue boundary.
 Tests mock the Edge TTS and FFmpeg adapters, so they run offline and without
 requiring the `ffmpeg` executable.
 
-For a Windows packaging smoke test, build the distribution with
-`.\build-windows.ps1`, extract `dist\WindowsTTSApp-windows-x64.zip` to a
-temporary directory, and launch `WindowsTTSApp.exe` from the extracted
-`WindowsTTSApp` folder. Confirm the desktop window opens, then close it. This
-checks startup from the packaged archive rather than from the repository.
-FFmpeg is still required to generate audio; a real TTS/FFmpeg end-to-end run
-also requires network access and FFmpeg installed on `PATH`. To complete the
-end-to-end smoke test, launch the extracted app, enter a short script using
-the default speaker labels (for example `Caller: Hello from the release
-smoke test.`), generate audio, and confirm that the MP3 is non-empty at the
-selected output path.
+For package acceptance, follow the extracted-executable and clean-machine
+checks in [Windows package setup](docs/setup/WINDOWS_PACKAGE.md). An isolated
+folder on the development host is useful validation but does not establish a
+clean Windows 11 installation. The [tracker](docs/milestones/MILESTONE_TRACKER.md)
+records which completion gates have actually passed.

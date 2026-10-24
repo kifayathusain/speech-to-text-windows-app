@@ -1,0 +1,2 @@
+# Optional process-memory measurements for CPU benchmarks.
+psutil==7.2.2

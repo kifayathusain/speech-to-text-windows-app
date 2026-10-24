@@ -10,6 +10,8 @@ from pathlib import Path
 
 import edge_tts
 
+from .providers.base import CancellationToken
+
 
 class TTSGenerationError(RuntimeError):
     """Raised when Edge TTS cannot produce a complete audio file."""
@@ -21,7 +23,13 @@ def line_output_path(output_dir: Path, index: int) -> Path:
     return output_dir / f"line_{index:03d}.mp3"
 
 
-async def synthesize_line(text: str, voice: str, output_file: Path) -> Path:
+async def synthesize_line(
+    text: str,
+    voice: str,
+    output_file: Path,
+    *,
+    cancellation_token: CancellationToken | None = None,
+) -> Path:
     """Synthesize ``text`` with ``voice`` and atomically save it to ``output_file``.
 
     Edge TTS writes to a temporary file in the destination directory first.
@@ -33,6 +41,8 @@ async def synthesize_line(text: str, voice: str, output_file: Path) -> Path:
         raise ValueError("Speech text cannot be empty.")
     if not voice or not voice.strip():
         raise ValueError("An Edge TTS voice must be selected.")
+    if cancellation_token is not None:
+        cancellation_token.raise_if_cancelled()
 
     temporary_file = None
     temporary_path = None
@@ -52,6 +62,8 @@ async def synthesize_line(text: str, voice: str, output_file: Path) -> Path:
         if not temporary_path.is_file() or temporary_path.stat().st_size == 0:
             raise TTSGenerationError("Edge TTS returned an empty audio file.")
 
+        if cancellation_token is not None:
+            cancellation_token.raise_if_cancelled()
         os.replace(temporary_path, output_file)
         return output_file
     except TTSGenerationError:

@@ -1,2 +1,4 @@
 -r requirements.txt
-pyinstaller>=6.11
+-r requirements-kokoro.txt
+-r requirements-piper.txt
+pyinstaller>=6.11,<7

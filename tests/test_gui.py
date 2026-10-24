@@ -13,6 +13,7 @@ import pytest
 
 from ttsapp import gui
 from ttsapp.audio_combiner import FFmpegExecutionError, FFmpegNotFoundError
+from ttsapp.desktop_options import DesktopGenerationOptions
 from ttsapp.gui import (
     TTSDesktopApp,
     build_speaker_voice_mapping,
@@ -20,6 +21,7 @@ from ttsapp.gui import (
     format_generation_error,
     validate_script_text,
 )
+from ttsapp.provider_manager import ProviderManager
 from ttsapp.tts_engine import TTSGenerationError
 
 
@@ -48,9 +50,9 @@ def test_build_speaker_voice_mapping_accepts_custom_names():
 
 
 def test_build_speaker_voice_mapping_allows_an_unused_blank_slot():
-    assert build_speaker_voice_mapping(
-        [("Doctor", "en-US-JennyNeural"), ("", "")]
-    ) == {"Doctor": "en-US-JennyNeural"}
+    assert build_speaker_voice_mapping([("Doctor", "en-US-JennyNeural"), ("", "")]) == {
+        "Doctor": "en-US-JennyNeural"
+    }
 
 
 @pytest.mark.parametrize(
@@ -155,6 +157,18 @@ def test_generate_click_runs_work_in_background_and_updates_ui_from_queue(
     app.progress_bar = Progress()
     app._queue = queue.Queue()
     app._worker = None
+    app._closing = False
+    app._provider_manager = ProviderManager()
+
+    class Player:
+        def stop(self):
+            pass
+
+    app._player = Player()
+    app._read_options = lambda: DesktopGenerationOptions("edge")
+    app._set_busy = lambda busy: app.generate_button.configure(
+        state="disabled" if busy else "normal"
+    )
     monkeypatch.setattr(gui, "generate_conversation", slow_generation)
     monkeypatch.setattr(gui.messagebox, "showinfo", lambda *args: None)
 
@@ -165,6 +179,9 @@ def test_generate_click_runs_work_in_background_and_updates_ui_from_queue(
         assert app._status_var.value == "Generating..."
         assert app.generate_button.state == "disabled"
         assert ui_thread_calls == [main_thread] * 3
+        generation_worker = app._worker
+        app._on_preview_clicked(0)
+        assert app._worker is generation_worker
 
         allow_generation_to_finish.set()
         app._worker.join(timeout=2)
