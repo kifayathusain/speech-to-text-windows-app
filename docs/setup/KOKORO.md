@@ -41,8 +41,10 @@ into an explicit user-owned directory. No assets are bundled with this code.
 
 Both digests were verified against the release API metadata before loading.
 This is the full v1.0 ONNX export of Kokoro-82M, not the int8/fp16 variant.
-The initial catalog exposes af_heart, af_bella, am_adam (US English) and bf_emma
-(British English). Only explicitly configured voice metadata is advertised;
+The catalog exposes all 20 American and eight British English voices in the
+official v1.0 inventory. Search by name or filter en-US/en-GB in the desktop.
+All voices share this installation; no per-voice model download is needed.
+Only explicitly configured voice metadata is advertised;
 loading checks that catalog voices actually exist in the verified archive.
 
 ## Python API

@@ -2,7 +2,8 @@
 
 Open **Model library...** from the desktop application. The catalog lists
 Kokoro-82M first as the quality target and Piper Lessac low as the lightweight
-alternative, with download size, voices, languages, runtime prerequisites, and
+default, followed by all pinned British/American Piper model variants, with
+download size, voices, languages, runtime prerequisites, and
 license/attribution information. **License information** opens the selected
 upstream license/model notice page. Installing model files does not install a
 Python runtime or optional inference packages; see [Kokoro](KOKORO.md) and
@@ -35,3 +36,21 @@ background worker and renders queued results only on the main UI thread. Closing
 the library requests cancellation and waits asynchronously for cleanup. Abrupt
 process termination can leave recoverable staging; it cannot make partial assets
 appear installed. No model binaries are included in Git or automatically bundled.
+
+
+## Complete English library (M11)
+
+The bundled offline inventory includes 28 Kokoro voices and 38 Piper English
+model variants (2,006 individual speaker choices). Search the library by model
+name or quality and scroll to the desired entry. Large multispeaker models are
+installed once for all their speakers. Downloads remain explicit and per model.
+The main window supports voice-name, quality and upstream-speaker-name search
+with en-US/en-GB filtering. Filtering does not change existing selections.
+Selected voice details show its model ID and whether required files are present;
+full integrity and installation checks run in workers before use. Reopen the
+library to verify or reinstall a corrupt model. Each model retains its own card
+and license link; no shared voice license is assumed.
+
+Existing Kokoro and Lessac low installation identities and asset hashes are
+preserved. No model weights are downloaded at startup. Future inventory updates
+require a reviewed metadata snapshot; see [M11](../milestones/M11_ENGLISH_VOICES.md).

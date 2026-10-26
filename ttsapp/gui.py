@@ -36,6 +36,7 @@ from .desktop_options import (
     DesktopGenerationOptions,
     build_desktop_options,
     build_export_settings,
+    filter_voice_choices,
 )
 from .model_library import ModelLibraryWindow
 from .parser import ConversationLine
@@ -156,6 +157,8 @@ class TTSDesktopApp(tk.Tk):
         self._provider_id = "edge"
         self._provider_var = tk.StringVar(value=self._choices["edge"].display_name)
         self._language_var = tk.StringVar(value="All languages")
+        self._voice_search_var = tk.StringVar()
+        self._voice_details: list[tk.StringVar] = []
         self._provider_status = tk.StringVar()
         self._speed_var = tk.StringVar(value="1.0")
         self._process_text_var = tk.BooleanVar(value=False)
@@ -256,6 +259,16 @@ class TTSDesktopApp(tk.Tk):
         ttk.Label(self, textvariable=self._provider_status, wraplength=760).pack(
             fill="x", padx=10
         )
+        search_frame = ttk.Frame(self)
+        search_frame.pack(fill="x", padx=10)
+        ttk.Label(search_frame, text="Search voices / quality / speaker:").pack(
+            side="left"
+        )
+        self._voice_search = ttk.Entry(
+            search_frame, textvariable=self._voice_search_var
+        )
+        self._voice_search.pack(side="left", fill="x", expand=True, padx=6)
+        self._voice_search_var.trace_add("write", lambda *args: self._filter_voices())
 
     def _build_speaker_controls(self) -> None:
         frame = ttk.LabelFrame(self, text="Speakers and voices")
@@ -265,22 +278,27 @@ class TTSDesktopApp(tk.Tk):
             voice_var = tk.StringVar(value=voice)
             self._speaker_rows.append((speaker_var, voice_var))
             ttk.Label(frame, text=f"Speaker {index + 1}").grid(
-                row=index, column=0, padx=6, pady=4
+                row=index * 2, column=0, padx=6, pady=4
             )
             entry = ttk.Entry(frame, textvariable=speaker_var, width=20)
-            entry.grid(row=index, column=1, padx=4, pady=4, sticky="ew")
+            entry.grid(row=index * 2, column=1, padx=4, pady=4, sticky="ew")
             self._speaker_entries.append(entry)
             voice_box = ttk.Combobox(frame, textvariable=voice_var, width=29)
-            voice_box.grid(row=index, column=2, padx=4, pady=4, sticky="ew")
+            voice_box.grid(row=index * 2, column=2, padx=4, pady=4, sticky="ew")
             self._voice_boxes.append(voice_box)
             button = ttk.Button(
                 frame,
                 text="Preview",
                 command=lambda slot=index: self._on_preview_clicked(slot),
             )
-            button.grid(row=index, column=3, padx=6, pady=4)
+            button.grid(row=index * 2, column=3, padx=6, pady=4)
             self._preview_buttons.append(button)
-            voice_var.trace_add("write", lambda *args: self._invalidate_preview())
+            detail = tk.StringVar()
+            self._voice_details.append(detail)
+            ttk.Label(frame, textvariable=detail, wraplength=700).grid(
+                row=index * 2 + 1, column=0, columnspan=4, sticky="w", padx=6
+            )
+            voice_var.trace_add("write", lambda *args: self._voice_changed())
         frame.columnconfigure(1, weight=1)
         frame.columnconfigure(2, weight=2)
         ttk.Label(
@@ -458,6 +476,7 @@ class TTSDesktopApp(tk.Tk):
         languages = tuple(sorted({voice.language for voice in choice.voices}))
         self._language_box.configure(values=("All languages", *languages))
         self._language_var.set("All languages")
+        self._voice_search_var.set("")
         self._filter_voices()
         if choice.online:
             self._provider_status.set(
@@ -476,11 +495,38 @@ class TTSDesktopApp(tk.Tk):
         language = self._language_var.get()
         values = tuple(
             voice.voice_id
-            for voice in choice.voices
-            if language == "All languages" or voice.language == language
+            for voice in filter_voice_choices(
+                choice, language, self._voice_search_var.get()
+            )
         )
         for box in self._voice_boxes:
             box.configure(values=values)
+
+    def _voice_changed(self) -> None:
+        """Describe selected assets cheaply; full verification happens in workers."""
+        self._invalidate_preview()
+        voices = {
+            voice.voice_id: voice for voice in self._choices[self._provider_id].voices
+        }
+        for (_, selected), detail in zip(
+            self._speaker_rows, self._voice_details, strict=True
+        ):
+            voice = voices.get(selected.get())
+            if voice is None:
+                detail.set("")
+                continue
+            if voice.model_id is None or self._provider_id == "edge":
+                detail.set(voice.display_name)
+                continue
+            model = self._provider_manager.models.manifest(voice.model_id)
+            directory = self._provider_manager.models.model_directory(model.model_id)
+            present = all(
+                (directory / asset.filename).is_file() for asset in model.files
+            )
+            status = "Files present; verified on use" if present else "Not installed"
+            detail.set(
+                f"{voice.display_name} · {status} · Model library: {model.model_id}"
+            )
 
     def _apply_control_states(self) -> None:
         choice = self._choices[self._provider_id]
@@ -492,6 +538,7 @@ class TTSDesktopApp(tk.Tk):
             state="disabled" if self._busy or self._closing else "readonly"
         )
         self._model_library_button.configure(state=state)
+        self._voice_search.configure(state=state)
         for entry in self._speaker_entries:
             entry.configure(state=state)
         for box in self._voice_boxes:
@@ -547,8 +594,14 @@ class TTSDesktopApp(tk.Tk):
             self._model_library = ModelLibraryWindow(
                 self, self._provider_manager.models, self._provider_manager.close
             )
+            self._model_library.bind("<Destroy>", self._library_closed, add="+")
         else:
             self._model_library.lift()
+
+    def _library_closed(self, event: tk.Event) -> None:
+        """Refresh asset presence after the library's worker has finished cleanup."""
+        if event.widget is self._model_library and not self._closing:
+            self._voice_changed()
 
     def _choose_output_path(self) -> None:
         chosen = filedialog.asksaveasfilename(

@@ -28,6 +28,7 @@ established status on later edits and record compliance evidence separately.
 | M08 | High-Quality Export System | DONE | Passed real codec/UI/media safety gate; [evidence](M08_EXPORT.md) |
 | M09 | Performance Optimization | DONE | Passed real benchmarks/lifecycle/regressions; [evidence](M09_PERFORMANCE.md) |
 | M10 | Windows Packaging and Final QA | BLOCKED | Local standalone tests pass; clean Windows 11 evidence required; [details](M10_PACKAGING.md) |
+| M11 | Complete British and American English Voice Library | DONE | Passed all 2,034 CPU voice checks, Windows UI/media and regression gate; [evidence](M11_ENGLISH_VOICES.md) |
 
 “Pending” means the milestone has not been reviewed against the new gate. The
 standards/configuration update does not complete or reopen an application
@@ -59,6 +60,13 @@ reason when a milestone fails its completion gate. Do not turn a historical
 DONE into a new compliance pass without evidence.
 
 ## Evidence entries
+
+### M11 authorization — 2026-10-25
+
+The user explicitly authorized implementation of complete Kokoro/Piper British
+and American English coverage as M11. Proceed with this scoped follow-up while
+preserving M10 BLOCKED and M01–M09 DONE. This does not waive clean-machine QA.
+See [M11](M11_ENGLISH_VOICES.md) for inventory, acceptance and validation evidence.
 
 2026-10-24: Execution explicitly started at M01 after reviewing the existing
 implementation and 44 passing baseline tests. Later roadmap milestones have
@@ -169,3 +177,30 @@ commit, push, public release or security-policy bypass occurred.
 
 The user confirmed that a clean Windows 11 machine is not available. M10 remains
 BLOCKED; no clean-machine pass or permission to skip the gate is inferred.
+
+### M11 completion — 2026-10-25
+
+Gate passed: [complete English voice evidence](M11_ENGLISH_VOICES.md). All 28
+Kokoro voices and all 2,006 Piper speaker/quality choices across 38 pinned
+British/American English model variants generated valid nonzero PCM using real
+CPU inference with Python network connection helpers denied. Pinned metadata,
+per-model downloads/notices, numeric speakers, lazy model/config session reuse,
+search, model guidance and corrupt-preview prerequisite checks are implemented.
+Existing Kokoro/Lessac installations remain compatible.
+
+Final full suite: **235 passed, 11 opt-in skips**; real Windows search,
+multispeaker previews, mixed-model generation and WAV/MP3/M4A export: **one
+passed**. Native Windows playback passes in the full suite. All 17 changed/new
+Python files pass Ruff and manual readability/architecture review. Repository
+baseline remains I001 in `main.py`/`tests/test_parser.py` and five untouched
+formatting differences, documented in M11. No introduced violations or unrelated
+formatting. Exact commands, combined report hash and per-model counts are in M11.
+
+A new local Windows QA ZIP contains the complete offline inventory; standalone
+Kokoro/Piper and all formats pass with existing model installations and sanitized
+environment paths. SHA-256:
+`7656bd01335b3dcf1f47db83ccf20fa99ba6a43ebf67385ae8b1d89161b413d1`.
+Temporary validation installations and redundant new build directories were
+removed; earlier artifacts and user models remain intact. No human quality,
+clean-machine, signing, public release, commit or push claim. M01–M09 remain
+DONE; M10 remains BLOCKED exactly as authorized when M11 began.

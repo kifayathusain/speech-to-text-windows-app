@@ -55,6 +55,7 @@ $arguments = @(
     "--distpath", $distRoot, "--workpath", (Join-Path $outputRoot "work"),
     "--specpath", $outputRoot, "--name", "WindowsTTSApp",
     "--additional-hooks-dir", (Join-Path $repoRoot "build_hooks"),
+    "--add-data", "$(Join-Path $repoRoot 'ttsapp/models/piper_english.json');ttsapp/models",
     "--exclude-module", "torch", "--exclude-module", "tensorflow",
     "--exclude-module", "pytest", "--exclude-module", "onnx"
 )

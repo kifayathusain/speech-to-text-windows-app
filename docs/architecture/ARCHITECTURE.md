@@ -88,3 +88,19 @@ PyInstaller hooks retain native CPU/phonemizer data while excluding unselected
 auxiliary weights. Builds use fresh output directories and keep user models
 separate. See [Windows package setup](../setup/WINDOWS_PACKAGE.md) for the
 remaining clean-machine gate and distribution obligations.
+
+
+## M11 complete English voice inventory
+
+`models/english_catalog.py` reads a bundled pinned Piper JSON snapshot and shares
+Kokoro voice IDs with the installer/provider factories. The developer-only
+catalog updater verifies LFS hashes and Git identities for configs/cards; no
+runtime network discovery is added. Existing Kokoro/Lessac installation
+identities remain compatible. ProviderManager describes every model without
+loading weights; Piper validates the selected installation on first load and
+switches lazily between model sessions. Numeric speaker selection is separate
+from model identity, so speakers in a shared model reuse one CPU session.
+Stable per-speaker IDs and catalog digests separate preview cache entries.
+Desktop searches use metadata only; required-file presence is a quick hint,
+while complete integrity checks and inference remain in background workers.
+The library retains per-model download/removal transactions and notices.

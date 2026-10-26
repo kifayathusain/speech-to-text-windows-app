@@ -182,6 +182,14 @@ Python API with explicitly verified local voices. The [Kokoro-82M CPU provider](
 progress, and cancellation; see [desktop controls](docs/setup/DESKTOP_PREVIEW.md). See the
 [tracker](docs/milestones/MILESTONE_TRACKER.md) for validated status.
 
+[M11](docs/milestones/M11_ENGLISH_VOICES.md) adds the complete pinned British and
+American English inventory: 28 Kokoro voices and 2,006 Piper speaker/quality
+choices across 38 model variants. Search voices by name, quality or speaker and
+filter en-US/en-GB in the desktop. Install selected Piper models through
+[Model library](docs/setup/MODEL_LIBRARY.md); all Kokoro voices share one model
+installation. Downloads remain explicit, with verified assets and per-model
+license information.
+
 ## Tests
 
 Contributors and Codex sessions must start with [AGENTS.md](AGENTS.md) and follow

@@ -44,6 +44,10 @@ IN_PROGRESS, BLOCKED, or DONE as defined in the master instructions.
 
 ## Milestones
 
+M11 is a user-authorized follow-up added on 2026-10-25 while M10 remains
+BLOCKED. Its implementation may proceed independently; M10's clean-machine
+completion gate remains required and unchanged.
+
 ### M01 — Baseline Review and Architecture
 
 [Milestone document](M01_BASELINE.md)
@@ -184,4 +188,18 @@ IN_PROGRESS, BLOCKED, or DONE as defined in the master instructions.
 **Acceptance:** A clean Windows 11 environment can install, launch, download a model, synthesize offline audio, and export playable files.
 
 **Coding standards compliance:** Before DONE, complete the [shared compliance gate](#shared-compliance-gate) and record commands, results, readability review, and any pre-existing violations in the [tracker](MILESTONE_TRACKER.md).
+
+### M11 — Complete British and American English Voice Library
+
+[Milestone document](M11_ENGLISH_VOICES.md)
+
+- Expose all 28 official Kokoro-82M v1.0 British/American voices.
+- Include every Piper en_US/en_GB model, quality variant and individual speaker
+  in the pinned official inventory with verified downloads and model notices.
+- Support selected-model lifecycle, speaker selection, search and previews.
+- Preserve existing installations, Edge workflows and M10's blocked status.
+
+**Acceptance:** Exact catalog coverage, offline synthesis of every exposed
+voice/speaker, usable Windows selection/preview/model management, validated
+representative exports, and the shared coding standards gate recorded in M11.
 

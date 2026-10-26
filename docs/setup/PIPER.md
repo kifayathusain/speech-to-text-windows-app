@@ -18,7 +18,18 @@ Runtime license: GPL-3.0-or-later, as identified by the release metadata. Model
 and voice/data licenses are separate. Review them before distribution; no models
 or optional runtimes are bundled by this milestone.
 
-The initial explicit catalog descriptor is `en_US-lessac-low`, mono 16 kHz.
+The default explicit catalog descriptor is `en_US-lessac-low`, mono 16 kHz.
+M11 adds all 38 British/American English model variants from the pinned catalog
+and all 2,006 speaker choices defined by their verified configurations. Use
+Model library search to install a selected model and the main voice search to
+filter by name, quality or speaker. Multispeaker IDs use
+`<upstream-model-key>:speaker_<numeric-id>`; the selected speaker's upstream name
+appears below the selector. Model-level locales follow upstream metadata and
+do not guarantee that every training speaker has the same native accent.
+
+LibriTTS-R's index advertises 2,306 speakers, but its actual configuration defines
+904. The application follows the verified configuration and does not expose
+out-of-range IDs. See [M11](../milestones/M11_ENGLISH_VOICES.md) for evidence.
 Its [model card](https://huggingface.co/rhasspy/piper-voices/blob/5041a7a49ae5b3a0f30e6837769eb03fdbb231bd/en/en_US/lessac/low/MODEL_CARD)
 links to the [Lessac dataset terms](https://www.cstr.ed.ac.uk/projects/blizzard/2013/lessac_blizzard2013/license.html).
 Do not assume the repository-level license covers every voice. This low-quality
@@ -44,6 +55,10 @@ The model hash was verified against upstream LFS metadata. The configuration's
 Git blob identity was verified at the pinned revision, then SHA-256 recorded.
 The provider validates both files before inference. Further voices require
 explicit `PiperModel` descriptors with their own trusted checksums/metadata.
+For any bundled English model, `english_models(directory, model_id)` from
+`ttsapp.models.piper_catalog` builds every speaker descriptor. Each speaker
+uses its explicit upstream numeric ID; the provider reuses one session while
+switching speakers in the same model, and releases it when changing models.
 Only bundled eSpeak phonemization is currently supported, avoiding optional
 language-resource downloads. English/other eSpeak languages retain their voice
 configurations; no unsupported external phonemizer is silently selected.

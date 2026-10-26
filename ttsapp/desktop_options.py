@@ -5,7 +5,24 @@ from dataclasses import dataclass
 
 from .audio_export import ExportSettings, OutputFormat
 from .provider_manager import ProviderChoice
+from .providers.base import VoiceMetadata
 from .text_processing import TextProcessingSettings
+
+
+def filter_voice_choices(
+    choice: ProviderChoice, language: str, query: str
+) -> tuple[VoiceMetadata, ...]:
+    """Filter names, stable IDs and model identities without accessing weights."""
+    terms = query.casefold().split()
+    return tuple(
+        voice
+        for voice in choice.voices
+        if (language == "All languages" or voice.language == language)
+        and all(
+            term in f"{voice.voice_id} {voice.display_name} {voice.model_id}".casefold()
+            for term in terms
+        )
+    )
 
 
 @dataclass(frozen=True)

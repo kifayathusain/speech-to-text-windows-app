@@ -7,6 +7,7 @@ import sys
 import threading
 import wave
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 
@@ -52,6 +53,7 @@ def runtime(monkeypatch: pytest.MonkeyPatch) -> SimpleNamespace:
             self, text: str, settings: SimpleNamespace
         ) -> Iterator[SimpleNamespace]:
             state.length_scale = settings.length_scale
+            state.speaker_id = settings.speaker_id
             if state.empty:
                 return
             yield SimpleNamespace(audio_int16_bytes=b"\x01\x00" * 100)
@@ -262,3 +264,82 @@ def test_piper_load_rechecks_after_successful_prevalidation(
     piper_model.configuration.path.write_bytes(b"changed after validation")
     with pytest.raises(ModelValidationError, match="checksum mismatch"):
         provider.prepare("test-voice")
+
+
+def test_piper_selects_speakers_without_reloading_shared_model(
+    piper_model: PiperModel, runtime: SimpleNamespace, tmp_path: Path
+) -> None:
+    configuration = make_asset(
+        tmp_path / "multi.json",
+        json.dumps({"audio": {"sample_rate": 16000}, "num_speakers": 2}).encode(),
+    )
+    first = replace(piper_model, configuration=configuration, speaker_id=0)
+    second = replace(
+        first, voice=VoiceMetadata("second", "Second", "en-US"), speaker_id=1
+    )
+    provider = PiperTTSProvider((first, second))
+    for model in (first, second, first):
+        asyncio.run(
+            provider.synthesize(
+                SynthesisRequest("Hello", model.voice.voice_id, "wav"),
+                tmp_path / "out.wav",
+            )
+        )
+        assert runtime.speaker_id == model.speaker_id
+    assert runtime.loads == 1
+    provider.close()
+    provider.prepare("second")
+    assert runtime.loads == 2
+
+
+@pytest.mark.parametrize("speaker_id", [None, -1, 2, True])
+def test_piper_rejects_missing_or_out_of_range_speaker(
+    piper_model: PiperModel, tmp_path: Path, speaker_id: int | None
+) -> None:
+    configuration = make_asset(
+        tmp_path / "multi.json",
+        json.dumps({"audio": {"sample_rate": 16000}, "num_speakers": 2}).encode(),
+    )
+    model = replace(piper_model, configuration=configuration, speaker_id=speaker_id)
+    with pytest.raises(ModelValidationError, match="speaker"):
+        PiperTTSProvider((model,)).validate_configuration(
+            SynthesisRequest("Hello", "test-voice", "wav")
+        )
+
+
+def test_piper_model_switch_loads_only_selected_assets_and_releases_session(
+    piper_model: PiperModel, runtime: SimpleNamespace, tmp_path: Path
+) -> None:
+    other = replace(
+        piper_model,
+        voice=VoiceMetadata("other", "Other", "en-GB"),
+        model=make_asset(tmp_path / "other.onnx", b"other model"),
+    )
+    provider = PiperTTSProvider((piper_model, other))
+    provider.prepare("test-voice")
+    provider.prepare("other")
+    provider.prepare("test-voice")
+    assert runtime.loads == 3
+    other.model.path.unlink()
+    provider.prepare("test-voice")
+    assert runtime.loads == 3
+    with pytest.raises(ModelValidationError, match="Model library"):
+        provider.prepare("other")
+
+
+def test_piper_configuration_change_for_same_weights_reloads_session(
+    piper_model: PiperModel, runtime: SimpleNamespace, tmp_path: Path
+) -> None:
+    second = replace(
+        piper_model,
+        voice=VoiceMetadata("second", "Second", "en-US"),
+        configuration=make_asset(
+            tmp_path / "multi.json",
+            json.dumps({"audio": {"sample_rate": 16000}, "num_speakers": 2}).encode(),
+        ),
+        speaker_id=1,
+    )
+    provider = PiperTTSProvider((piper_model, second))
+    provider.prepare("test-voice")
+    provider.prepare("second")
+    assert runtime.loads == 2

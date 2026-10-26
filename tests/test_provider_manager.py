@@ -7,6 +7,7 @@ import pytest
 from ttsapp.models.assets import ModelValidationError
 from ttsapp.models.manager import InstallationState, ModelManager
 from ttsapp.provider_manager import ProviderManager
+from ttsapp.providers.base import SynthesisRequest
 
 
 def test_choices_do_not_create_model_storage_and_edge_needs_no_model(
@@ -62,3 +63,34 @@ def test_selected_provider_skips_disk_scan_until_session_release(
     providers.close()
     assert providers.get("kokoro") is not provider
     assert checks == ["kokoro-82m-v1", "kokoro-82m-v1"]
+
+
+def test_piper_checks_only_requested_installation_on_load(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    models = ModelManager(tmp_path)
+    checks = []
+
+    def status(model_id: str) -> InstallationState:
+        checks.append(model_id)
+        return InstallationState.NOT_INSTALLED
+
+    monkeypatch.setattr(models, "status", status)
+    providers = ProviderManager(models)
+    piper = providers.get("piper")
+    assert checks == []
+    with pytest.raises(ModelValidationError, match="piper-en_gb-vctk-medium"):
+        piper.prepare("en_GB-vctk-medium:speaker_108")
+    assert checks == ["piper-en_gb-vctk-medium"]
+
+
+def test_piper_prevalidation_checks_installation_before_preview_cache_use(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    models = ModelManager(tmp_path)
+    monkeypatch.setattr(models, "status", lambda model_id: InstallationState.CORRUPT)
+    provider = ProviderManager(models).get("piper")
+    with pytest.raises(ModelValidationError, match="piper-lessac-low.*Model library"):
+        provider.validate_configuration(
+            SynthesisRequest("Hello", "en_US-lessac-low", "wav")
+        )

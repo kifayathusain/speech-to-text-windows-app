@@ -2,6 +2,7 @@
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from urllib.parse import urlparse
 
 
@@ -63,8 +64,11 @@ class ModelManifest:
         return sum(file.size_bytes for file in self.files)
 
 
+@lru_cache(maxsize=1)
 def default_catalog() -> tuple[ModelManifest, ...]:
     """Return the quality-first Kokoro catalog and lightweight Piper alternative."""
+    from .english_catalog import KOKORO_VOICE_IDS, piper_english_catalog
+
     kokoro_source = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/"
     piper_source = (
         "https://huggingface.co/rhasspy/piper-voices/resolve/"
@@ -90,7 +94,7 @@ def default_catalog() -> tuple[ModelManifest, ...]:
                     "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d",
                 ),
             ),
-            voices=("af_heart", "af_bella", "am_adam", "bf_emma"),
+            voices=KOKORO_VOICE_IDS,
             languages=("en-US", "en-GB"),
             license_name="Apache-2.0 model; see upstream voice/data notices",
             license_url="https://huggingface.co/hexgrad/Kokoro-82M",
@@ -129,6 +133,10 @@ def default_catalog() -> tuple[ModelManifest, ...]:
             attribution="Piper voice from rhasspy/piper-voices; Lessac Blizzard 2013 dataset. See MODEL_CARD.",
             runtime="requirements-piper.txt; CPU only",
         ),
+    ) + tuple(
+        entry.manifest
+        for entry in piper_english_catalog()
+        if entry.key != "en_US-lessac-low"
     )
 
 

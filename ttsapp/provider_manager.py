@@ -6,14 +6,14 @@ import threading
 from dataclasses import asdict, dataclass
 
 from .models.assets import ModelValidationError
-from .models.catalog import default_manifest
+from .models.catalog import default_catalog, default_manifest
 from .models.kokoro_catalog import kokoro_v1_model
 from .models.manager import InstallationState, ModelManager
-from .models.piper_catalog import lessac_low_model
+from .models.piper_catalog import english_models
 from .providers.base import TTSProvider, VoiceMetadata
 from .providers.edge import EdgeTTSProvider
 from .providers.kokoro import KokoroTTSProvider
-from .providers.piper import PiperTTSProvider
+from .providers.piper import PiperModel, PiperTTSProvider
 
 
 @dataclass(frozen=True)
@@ -42,9 +42,7 @@ class ProviderManager:
         kokoro = KokoroTTSProvider(
             kokoro_v1_model(self.models.model_directory("kokoro-82m-v1"))
         )
-        piper = PiperTTSProvider(
-            (lessac_low_model(self.models.model_directory("piper-lessac-low")),)
-        )
+        piper = PiperTTSProvider(self._piper_models())
         return (
             ProviderChoice(
                 "edge", "Microsoft Edge TTS", edge.get_available_voices(), True, False
@@ -72,14 +70,34 @@ class ProviderManager:
         if provider_id == "edge":
             return "edge-adapter-v1"
         if provider_id == "kokoro":
-            manifest = default_manifest("kokoro-82m-v1")
+            manifests = (default_manifest("kokoro-82m-v1"),)
         elif provider_id == "piper":
-            manifest = default_manifest("piper-lessac-low")
+            manifests = tuple(
+                model for model in default_catalog() if model.provider_id == "piper"
+            )
         else:
             raise ValueError(f"Unknown TTS provider: '{provider_id}'.")
         return hashlib.sha256(
-            json.dumps(asdict(manifest), sort_keys=True).encode()
+            json.dumps([asdict(model) for model in manifests], sort_keys=True).encode()
         ).hexdigest()
+
+    def _piper_models(self) -> tuple[PiperModel, ...]:
+        """Describe all voices without reading installed weights or runtime imports."""
+        return tuple(
+            descriptor
+            for manifest in self.models.list_models()
+            if manifest.provider_id == "piper"
+            for descriptor in english_models(
+                self.models.model_directory(manifest.model_id), manifest.model_id
+            )
+        )
+
+    def _check_piper_installation(self, model_id: str) -> None:
+        """Verify only the requested model, including its marker and model card."""
+        if self.models.status(model_id) != InstallationState.INSTALLED:
+            raise ModelValidationError(
+                f"Install and verify {model_id} in Model library."
+            )
 
     def get(self, provider_id: str) -> TTSProvider:
         """Resolve a verified model-backed provider; call outside the UI thread."""
@@ -92,18 +110,23 @@ class ProviderManager:
                 if provider_id == "kokoro":
                     model_id = "kokoro-82m-v1"
                 elif provider_id == "piper":
-                    model_id = "piper-lessac-low"
+                    model_id = None
                 else:
                     raise ValueError(f"Unknown TTS provider: '{provider_id}'.")
-                if self.models.status(model_id) != InstallationState.INSTALLED:
+                if model_id is not None and (
+                    self.models.status(model_id) != InstallationState.INSTALLED
+                ):
                     raise ModelValidationError(
                         "Install and verify the selected model in Model library."
                     )
-                directory = self.models.model_directory(model_id)
                 if provider_id == "kokoro":
+                    directory = self.models.model_directory(model_id)
                     provider = KokoroTTSProvider(kokoro_v1_model(directory))
                 else:
-                    provider = PiperTTSProvider((lessac_low_model(directory),))
+                    provider = PiperTTSProvider(
+                        self._piper_models(),
+                        validate_installation=self._check_piper_installation,
+                    )
             if self._selected is not None:
                 self._selected.close()
             self._selected = provider

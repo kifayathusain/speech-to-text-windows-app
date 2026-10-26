@@ -56,8 +56,18 @@ class ModelLibraryWindow(tk.Toplevel):
         self._verify()
 
     def _build_widgets(self) -> None:
+        search = ttk.Frame(self)
+        search.pack(fill="x", padx=12, pady=(8, 0))
+        ttk.Label(search, text="Search models:").pack(side="left")
+        self._search = tk.StringVar()
+        ttk.Entry(search, textvariable=self._search).pack(
+            side="left", fill="x", expand=True
+        )
+        self._search.trace_add("write", lambda *args: self._filter_models())
+        table = ttk.Frame(self)
+        table.pack(fill="both", expand=True, padx=12, pady=12)
         self._tree = ttk.Treeview(
-            self,
+            table,
             columns=("name", "size", "status"),
             show="headings",
             height=6,
@@ -81,7 +91,10 @@ class ModelLibraryWindow(tk.Toplevel):
                     "Checking...",
                 ),
             )
-        self._tree.pack(fill="both", expand=True, padx=12, pady=12)
+        scrollbar = ttk.Scrollbar(table, command=self._tree.yview)
+        self._tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self._tree.pack(side="left", fill="both", expand=True)
         self._tree.bind("<<TreeviewSelect>>", lambda event: self._show_details())
         ttk.Label(
             self, textvariable=self._details, wraplength=720, justify="left"
@@ -122,11 +135,21 @@ class ModelLibraryWindow(tk.Toplevel):
             return
         model = self._manager.manifest(model_id)
         self._details.set(
-            f"Voices: {', '.join(model.voices)}\n"
+            f"Voices ({len(model.voices)}): {', '.join(model.voices[:4])}"
+            f"{' … (all speakers in main voice selector)' if len(model.voices) > 4 else ''}\n"
             f"Languages: {', '.join(model.languages)}\n"
             f"Runtime: {model.runtime}\nLicense: {model.license_name}\n"
             f"Attribution: {model.attribution}"
         )
+
+    def _filter_models(self) -> None:
+        """Keep tree records/statuses while showing only matching model names."""
+        query = self._search.get().casefold()
+        for model in self._manager.list_models():
+            if query in f"{model.model_id} {model.display_name}".casefold():
+                self._tree.move(model.model_id, "", "end")
+            else:
+                self._tree.detach(model.model_id)
 
     def _open_license(self) -> None:
         model_id = self._selected_id()
