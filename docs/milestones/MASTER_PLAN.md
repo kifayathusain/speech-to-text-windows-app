@@ -203,3 +203,23 @@ completion gate remains required and unchanged.
 voice/speaker, usable Windows selection/preview/model management, validated
 representative exports, and the shared coding standards gate recorded in M11.
 
+## Authorized M12–M17 follow-up — 2026-10-26
+
+The user requested implementation beginning with M12 from the approved
+JSON/multi-speaker packet. This follow-up may proceed independently of M10's
+clean Windows 11 blocker; that gate and every historical status remain intact.
+Follow the [shared execution rules](M12_M17_EXECUTION_RULES.md), especially the
+mandatory offline/fake-provider verification boundary. See the
+[packet entry point](START_HERE.md) and [registration rules](TRACKER_ADDITIONS.md).
+Only M12 is authorized for implementation in this session. Later milestones
+remain NOT_STARTED and must proceed sequentially when requested.
+
+| ID | Scope | Dependency | Acceptance reference |
+| --- | --- | --- | --- |
+| M12 | JSON Document Contract and Validation | Existing architecture | [Typed validation and lossless source round-trip](M12_JSON_DOCUMENT_CONTRACT.md) |
+| M13 | Role-to-Voice Mapping and Effective Settings | M12 | [Deterministic editable assignments](M13_ROLE_VOICE_MAPPING.md) |
+| M14 | Structured Generation and Exact Segment Pauses | M13 | [Ordered speech/silence and final pause](M14_STRUCTURED_GENERATION.md) |
+| M15 | Responsive Multi-Speaker Windows GUI | M14 | [Import/edit/mapping and responsive desktop](M15_RESPONSIVE_GUI.md) |
+| M16 | Saved Projects, Presets and JSON CLI | M15 | [Persistence and additive CLI input](M16_PROJECTS_PRESETS_CLI.md) |
+| M17 | Integrated Acceptance and Documentation | M16 | [Integrated safe acceptance](M17_INTEGRATED_ACCEPTANCE.md) |
+

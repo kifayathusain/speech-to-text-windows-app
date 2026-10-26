@@ -29,6 +29,12 @@ established status on later edits and record compliance evidence separately.
 | M09 | Performance Optimization | DONE | Passed real benchmarks/lifecycle/regressions; [evidence](M09_PERFORMANCE.md) |
 | M10 | Windows Packaging and Final QA | BLOCKED | Local standalone tests pass; clean Windows 11 evidence required; [details](M10_PACKAGING.md) |
 | M11 | Complete British and American English Voice Library | DONE | Passed all 2,034 CPU voice checks, Windows UI/media and regression gate; [evidence](M11_ENGLISH_VOICES.md) |
+| M12 | JSON Document Contract and Validation | DONE | Passed audited offline document/regression gate; [evidence](M12_JSON_DOCUMENT_CONTRACT.md) |
+| M13 | Role-to-Voice Mapping and Effective Settings | NOT_STARTED | Pending; [scope](M13_ROLE_VOICE_MAPPING.md) |
+| M14 | Structured Generation and Exact Segment Pauses | NOT_STARTED | Pending; [scope](M14_STRUCTURED_GENERATION.md) |
+| M15 | Responsive Multi-Speaker Windows GUI | NOT_STARTED | Pending; [scope](M15_RESPONSIVE_GUI.md) |
+| M16 | Saved Projects, Presets and JSON CLI | NOT_STARTED | Pending; [scope](M16_PROJECTS_PRESETS_CLI.md) |
+| M17 | Integrated Acceptance and Documentation | NOT_STARTED | Pending; [scope](M17_INTEGRATED_ACCEPTANCE.md) |
 
 “Pending” means the milestone has not been reviewed against the new gate. The
 standards/configuration update does not complete or reopen an application
@@ -60,6 +66,40 @@ reason when a milestone fails its completion gate. Do not turn a historical
 DONE into a new compliance pass without evidence.
 
 ## Evidence entries
+
+### M12–M17 authorization and registration — 2026-10-26
+
+The user approved the JSON/multi-speaker follow-up and explicitly requested
+M12 implementation using the packet. No ID conflicts were present. Registered
+M12–M17 as NOT_STARTED, then began M12 (IN_PROGRESS). M13–M17 remain unimplemented.
+The packet files already existed; their presence was not treated as acceptance.
+These milestones may proceed independently of M10's clean-machine blocker,
+without waiving it. M01–M09 and M11 retain DONE; M10 retains BLOCKED. The new
+follow-up uses reviewed offline/fake-provider tests under the
+[execution rules](M12_M17_EXECUTION_RULES.md), with no repeated voice validation.
+
+### M12 completion — 2026-10-26
+
+Gate passed: [full M12 evidence](M12_JSON_DOCUMENT_CONTRACT.md). Standalone typed
+JSON parsing/validation, immutable source snapshots, extensions, identity/revision,
+serialization and atomic Save As are implemented. Unmodified sample: three roles,
+26 ordered segments, 84 seconds of explicit pause including the final 30 seconds.
+Schema, guide, optional-field example and architecture documentation are current.
+
+CPython 3.13.17 / pytest 9.1.1 / Ruff 0.17.2; exact commands and
+[26-file audited allowlist](M12_OFFLINE_TESTS.txt) are recorded in M12. Focused:
+157 pass; final broad fake-provider/synthetic-media regression: **364 pass**, no
+skips/failures. Both new Python files pass Ruff format/lint and manual
+readability/type/error/boundary review. Repository baseline remains I001 in
+`main.py` and `tests/test_parser.py`, plus five untouched formatting differences.
+Failure/cleanup and existing cancellation regressions pass. No M12 required gate
+is unmet; document I/O has no cancellation API and no GUI import is claimed.
+
+No downloads, real synthesis, quality/comparison/listening tests, benchmarks,
+exhaustive voice checks, dependency installation, commit or push. Excluded tests
+and the resolved sandbox asyncio restriction are recorded separately. M13–M17
+remain NOT_STARTED; stop after M12. M01–M09/M11 retain DONE and M10 retains
+BLOCKED on actual clean Windows 11 evidence, without a waiver or inferred pass.
 
 ### M11 authorization — 2026-10-25
 

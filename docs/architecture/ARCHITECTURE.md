@@ -104,3 +104,15 @@ Stable per-speaker IDs and catalog digests separate preview cache entries.
 Desktop searches use metadata only; required-file presence is a quick hint,
 while complete integrity checks and inference remain in background workers.
 The library retains per-model download/removal transactions and notices.
+
+## M12 structured document contract
+
+`conversation_document.py` is a standalone JSON document layer with frozen
+speaker/segment/speech records, bounded path-based diagnostics, guarded UTF-8
+parsing, source/extension round-trip and explicit atomic Save As. Fresh imports
+receive fresh active identities; validated edits or explicit reloads retain
+identity and advance revision independently of content hashes. Defensive source
+copies keep worker snapshots isolated. The module imports no UI/provider/model
+code and leaves the legacy parser, service and all generation paths untouched.
+See the [format/API guide](../JSON_DOCUMENT_FORMAT.md). Mapping, structured
+generation, GUI and persistence are deferred to M13–M16.
